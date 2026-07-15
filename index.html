@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/vazir-font@latest/dist/font-face.css" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:linear-gradient(135deg,#0a0a0a 0%,#1a0033 50%,#0d1b3e 100%);min-height:100vh;font-family:'Vazir',sans-serif;color:#fff;padding:20px}
+        .card{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:25px;max-width:450px;margin:0 auto}
+        h2{text-align:center;margin-bottom:20px;font-size:20px}
+        .zone{border:2px dashed rgba(255,255,255,.2);border-radius:16px;padding:30px;text-align:center;cursor:pointer;transition:.3s}
+        .zone:hover,.zone.drag{border-color:rgba(138,43,226,.6);background:rgba(138,43,226,.05)}
+        .zone p{color:rgba(255,255,255,.6);font-size:14px}
+        .pwd-box{margin-top:15px;display:none}
+        .pwd-box input{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#fff;font-family:'Vazir',sans-serif;font-size:14px;direction:ltr;text-align:center}
+        .pwd-box input:focus{outline:none;border-color:rgba(138,43,226,.6)}
+        .btn{background:rgba(138,43,226,.3);border:1px solid rgba(138,43,226,.5);border-radius:12px;padding:12px;color:#fff;cursor:pointer;font-family:'Vazir',sans-serif;width:100%;margin-top:12px;font-size:14px}
+        .btn:hover{background:rgba(138,43,226,.5)}
+        .btn:disabled{opacity:.4;cursor:not-allowed}
+        #st{margin-top:10px;padding:10px;border-radius:10px;display:none;font-size:13px;text-align:center}
+        #st.ok{display:block;background:rgba(0,255,127,.1);border:1px solid rgba(0,255,127,.3)}
+        #st.er{display:block;background:rgba(255,0,0,.1);border:1px solid rgba(255,0,0,.3)}
+        #st.in{display:block;background:rgba(138,43,226,.1);border:1px solid rgba(138,43,226,.3)}
+        #res{margin-top:15px;display:none}
+        .lk{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.2s;font-size:12px;word-break:break-all}
+        .lk:active{background:rgba(138,43,226,.3)}
+        .lk .t{color:rgba(138,43,226,.9);font-weight:bold;font-size:11px}
+        .lk .n{color:rgba(255,255,255,.7);margin-top:4px}
+        #cp{color:#0f0;font-size:11px;text-align:center;display:none;margin-top:8px}
+        .sp{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;margin-left:6px;vertical-align:middle}
+        @keyframes sp{to{transform:rotate(360deg)}}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>🔓 NPvt Cracker</h2>
+    <div class="zone" id="drop">
+        <p>📁 فایل .npvt رو اینجا بنداز یا کلیک کن</p>
+        <input type="file" id="fi" accept=".npvt,.nvpt,.tmt,.json" hidden>
+    </div>
+    <div class="pwd-box" id="pwdBox">
+        <input type="password" id="pwd" placeholder="رمز عبور" autocomplete="off">
+        <button class="btn" id="dbtn" onclick="go()">🔓 باز کردن قفل</button>
+    </div>
+    <div id="st"></div>
+    <div id="cp">کپی شد!</div>
+    <div id="res"></div>
+    <button class="btn" onclick="tg.close()" style="margin-top:15px">بستن</button>
+</div>
+
+<script>
+const tg=window.Telegram.WebApp;tg.expand();tg.ready();
+let F=null; // file buffer
+
+document.getElementById('drop').onclick=()=>document.getElementById('fi').click();
+document.getElementById('fi').onchange=function(){if(this.files.length)pick(this.files[0])};
+const dz=document.getElementById('drop');
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag')};
+dz.ondragleave=()=>dz.classList.remove('drag');
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files.length)pick(e.dataTransfer.files[0])};
+
+function pick(f){
+    document.getElementById('drop').querySelector('p').textContent='📎 '+f.name;
+    const r=new FileReader();
+    r.onload=e=>{
+        F=new Uint8Array(e.target.result);
+        const h=String.fromCharCode(...F.slice(0,4));
+        if(h==='NPVT'||h==='NPVT1'){
+            document.getElementById('pwdBox').style.display='block';
+            S('in','🔑 فایل رمزنگاری شده. رمز رو وارد کن.');
+        }else{
+            parse(new TextDecoder().decode(F));
+        }
+    };
+    r.readAsArrayBuffer(f);
+}
+
+function S(c,m){const s=document.getElementById('st');s.className=c;s.innerHTML=m;s.style.display='block'}
+
+async function go(){
+    if(!F||!document.getElementById('pwd').value)return;
+    S('in','<span class="sp"></span>در حال رمزگشایی...');
+    document.getElementById('dbtn').disabled=true;
+    const pw=document.getElementById('pwd').value;
+    let ok=false;
+
+    // روش ۱: فقط AES
+    try{
+        const r=await aesDec(F,pw);
+        if(r){
+            const t=new TextDecoder().decode(r);
+            if(t.trim().startsWith('{')||t.trim().startsWith('[')){parse(t);ok=true}
+        }
+    }catch(e){}
+
+    // روش ۲: AES + NPVT1
+    if(!ok && typeof NPVT_TABLES!=='undefined'){
+        try{
+            const r=await aesDec(F,pw);
+            if(r){
+                const d=npvt1Dec(Array.from(r));
+                const t=new TextDecoder().decode(d);
+                if(t.trim().startsWith('{')||t.trim().startsWith('[')){parse(t);ok=true}
+            }
+        }catch(e){}
+    }
+
+    // روش ۳: NPVT1 روی خود فایل
+    if(!ok && typeof NPVT_TABLES!=='undefined'){
+        try{
+            const d=npvt1Dec(Array.from(F));
+            const t=new TextDecoder().decode(d);
+            if(t.trim().startsWith('{')||t.trim().startsWith('[')){parse(t);ok=true}
+        }catch(e){}
+    }
+
+    if(!ok) S('er','❌ رمز اشتباهه یا فایل خرابه');
+    document.getElementById('dbtn').disabled=false;
+}
+
+async function aesDec(buf,pw){
+    if(buf.length<32)return null;
+    const iv=buf.slice(12,28);
+    const ct=buf.slice(28);
+    const kb=iv.buffer.slice(iv.byteOffset,iv.byteOffset+iv.byteLength);
+    const cb=ct.buffer.slice(ct.byteOffset,ct.byteOffset+ct.byteLength);
+    const kh=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
+    const k=await crypto.subtle.importKey('raw',kh,{name:'AES-CBC'},false,['decrypt']);
+    try{
+        const d=await crypto.subtle.decrypt({name:'AES-CBC',iv:kb},k,cb);
+        return new Uint8Array(d);
+    }catch(e){return null}
+}
+
+// NPVT1
+function npvt1Dec(ct){
+    const T=NPVT_TABLES;if(!T||ct.length<16)return new Uint8Array(ct);
+    const n=ct.slice(0,16),c=ct.slice(16),o=new Uint8Array(c.length);
+    let cn=[...n];
+    for(let i=0;i<c.length;i+=16){
+        const k=coreXform([...cn],T);
+        const e=Math.min(i+16,c.length);
+        for(let j=0;j<e-i;j++)o[i+j]=c[i+j]^k[j];
+        for(let x=15;x>=0;x--){cn[x]=(cn[x]+1)&0xFF;if(cn[x]!==0)break}
+    }
+    return o;
+}
+
+function coreXform(b,T){
+    let r=[...b];const nr=T.nr,so=T.shift_order;
+    for(let i=0;i<nr-1;i++){
+        r=so.map(j=>r[j]);
+        for(let col=0;col<4;col++){
+            const bs=col*4;
+            const a0=T.tyBoxes[bs][r[bs]],a1=T.tyBoxes[bs+1][r[bs+1]],a2=T.tyBoxes[bs+2][r[bs+2]],a3=T.tyBoxes[bs+3][r[bs+3]];
+            for(let j=0;j<4;j++){
+                const ti=col*24+j*6,s1=28-j*8,s2=24-j*8;
+                const n0=(a0>>s1)&15,n1=(a1>>s1)&15,n2=(a2>>s1)&15,n3=(a3>>s1)&15;
+                const b0=T.xorTable[ti][n0][n1],b1=T.xorTable[ti+1][n2][n3];
+                const m0=(a0>>s2)&15,m1=(a1>>s2)&15,m2=(a2>>s2)&15,m3=(a3>>s2)&15;
+                const lo=T.xorTable[ti+5][T.xorTable[ti+2][m0][m1]][T.xorTable[ti+3][m2][m3]];
+                const hi=T.xorTable[ti+4][b0][b1];
+                r[bs+j]=lo|(hi<<4);
+            }
+            const c0=T.mbl[bs][r[bs]],c1=T.mbl[bs+1][r[bs+1]],c2=T.mbl[bs+2][r[bs+2]],c3=T.mbl[bs+3][r[bs+3]];
+            for(let j=0;j<4;j++){
+                const ti=col*24+j*6,s1=28-j*8,s2=24-j*8;
+                const n0=(c0>>s1)&15,n1=(c1>>s1)&15,n2=(c2>>s1)&15,n3=(c3>>s1)&15;
+                const a=T.xorTable[ti][n0][n1],b=T.xorTable[ti+1][n2][n3];
+                const hi=T.xorTable[ti+4][a][b];
+                const m0=(c0>>s2)&15,m1=(c1>>s2)&15,m2=(c2>>s2)&15,m3=(c3>>s2)&15;
+                const l0=T.xorTable[ti+2][m0][m1],l1=T.xorTable[ti+3][m2][m3];
+                const lo=T.xorTable[ti+5][l0][l1];
+                r[bs+j]=(hi<<4)|lo;
+            }
+        }
+    }
+    r=so.map(j=>r[j]);
+    for(let i=0;i<16;i++)r[i]=T.tboxesLast[i][r[i]];
+    return r;
+}
+
+function parse(text){
+    try{
+        const d=JSON.parse(text);
+        const cs=Array.isArray(d)?d:[d];
+        showLinks(cs);
+    }catch(e){S('er','❌ JSON معتبر نیست')}
+}
+
+function showLinks(cs){
+    let L=[];
+    cs.forEach((c,i)=>{
+        const p=c.v2rayProfile||c;
+        const nm=c.name||c.remarks||'cfg_'+(i+1);
+        const vj=p.v2rayJson||p.v2rayjson;
+        if(vj){
+            try{
+                const v=typeof vj==='string'?JSON.parse(vj):vj;
+                const a=v.address||v.add||'',pt=v.port||443,id=v.id||'',
+                      n=v.network||'tcp',sn=v.security==='tls'?(v.sni||a):'',
+                      pa=v.path||'',h=v.host||'',pr=v.protocol||'vless';
+                let u;
+                if(pr==='vless')u='vless://'+id+'@'+a+':'+pt+'?encryption=none&security=tls&sni='+sn+'&type='+n+'&host='+h+'&path='+pa+'#'+nm;
+                else if(pr==='vmess')u='vmess://'+btoa(JSON.stringify({v:'2',ps:nm,add:a,port:pt,id,aid:0,net:n,type:'host',host:h,path:pa,tls:'tls'}));
+                else if(pr==='trojan')u='trojan://'+id+'@'+a+':'+pt+'?security=tls&sni='+sn+'#'+nm;
+                if(u)L.push({n:nm,p:pr.toUpperCase(),u});
+            }catch(e){}
+        }
+        ['link','url','address'].forEach(k=>{
+            if(c[k]&&(c[k].startsWith('vless://')||c[k].startsWith('vmess://')||c[k].startsWith('trojan://')))
+                L.push({n:nm,p:k,u:c[k]});
+        });
+    });
+    if(!L.length){S('er','⚠️ پروتکلی پیدا نشد');return}
+    S('ok','✅ '+L.length+' کانفیگ پیدا شد');
+    document.getElementById('res').style.display='block';
+    document.getElementById('res').innerHTML=L.map((l,i)=>
+        '<div class="lk" onclick="cp('+i+')"><div class="t">'+l.p+'</div><div class="n">'+l.n+'</div></div>'
+    ).join('');
+    window._L=L;
+}
+
+function cp(i){
+    navigator.clipboard.writeText(window._L[i].u).then(()=>{
+        document.getElementById('cp').style.display='block';
+        setTimeout(()=>document.getElementById('cp').style.display='none',1500);
+    }).catch(()=>{
+        const t=document.createElement('textarea');t.value=window._L[i].u;
+        document.body.appendChild(t);t.select();document.execCommand('copy');
+        document.body.removeChild(t);document.getElementById('cp').style.display='block';
+        setTimeout(()=>document.getElementById('cp').style.display='none',1500);
+    });
+}
+</script>
+</body>
+</html>
