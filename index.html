@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/vazir-font@latest/dist/font-face.css" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:linear-gradient(135deg,#0a0a0a 0%,#1a0033 50%,#0d1b3e 100%);min-height:100vh;font-family:'Vazir',sans-serif;color:#fff;padding:20px}
+        .card{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:25px;max-width:450px;margin:0 auto}
+        h2{text-align:center;margin-bottom:20px;font-size:20px}
+        .zone{border:2px dashed rgba(255,255,255,.2);border-radius:16px;padding:30px;text-align:center;cursor:pointer;transition:.3s}
+        .zone:hover,.zone.drag{border-color:rgba(138,43,226,.6);background:rgba(138,43,226,.05)}
+        .zone p{color:rgba(255,255,255,.6);font-size:14px}
+        .pwd-box{margin-top:15px;display:none}
+        .pwd-box input{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#fff;font-family:'Vazir',sans-serif;font-size:14px;direction:ltr;text-align:center}
+        .pwd-box input:focus{outline:none;border-color:rgba(138,43,226,.6)}
+        .btn{background:rgba(138,43,226,.3);border:1px solid rgba(138,43,226,.5);border-radius:12px;padding:12px;color:#fff;cursor:pointer;font-family:'Vazir',sans-serif;width:100%;margin-top:12px;font-size:14px}
+        .btn:hover{background:rgba(138,43,226,.5)}
+        .btn:disabled{opacity:.4;cursor:not-allowed}
+        #status{margin-top:10px;padding:10px;border-radius:10px;display:none;font-size:13px;text-align:center}
+        #status.ok{display:block;background:rgba(0,255,127,.1);border:1px solid rgba(0,255,127,.3)}
+        #status.err{display:block;background:rgba(255,0,0,.1);border:1px solid rgba(255,0,0,.3)}
+        #status.info{display:block;background:rgba(138,43,226,.1);border:1px solid rgba(138,43,226,.3)}
+        #result{margin-top:15px;display:none}
+        .link{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.2s;font-size:12px;word-break:break-all}
+        .link:active{background:rgba(138,43,226,.3)}
+        .link .t{color:rgba(138,43,226,.9);font-weight:bold;font-size:11px}
+        .link .n{color:rgba(255,255,255,.7);margin-top:4px}
+        #copied{color:#0f0;font-size:11px;text-align:center;display:none;margin-top:8px}
+        .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-left:6px;vertical-align:middle}
+        @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>🔓 NPvt Cracker</h2>
+    <div class="zone" id="drop">
+        <p>📁 فایل .npvt رو اینجا بنداز یا کلیک کن</p>
+        <input type="file" id="fi" accept=".npvt,.nvpt,.tmt,.json" hidden>
+    </div>
+    <div class="pwd-box" id="pwdBox">
+        <input type="password" id="pwd" placeholder="رمز عبور را وارد کنید">
+        <button class="btn" id="decryptBtn" onclick="doDecrypt()">🔓 باز کردن قفل</button>
+    </div>
+    <div id="status"></div>
+    <div id="copied">کپی شد!</div>
+    <div id="result"></div>
+    <button class="btn" onclick="tg.close()" style="margin-top:15px">بستن</button>
+</div>
+
+<script src="npvt_tables.js"></script>
+<script>
+const tg=window.Telegram.WebApp;tg.expand();tg.ready();
+const drop=document.getElementById('drop'),fi=document.getElementById('fi'),
+      pwdBox=document.getElementById('pwdBox'),pwd=document.getElementById('pwd'),
+      status=document.getElementById('status'),result=document.getElementById('result'),
+      copied=document.getElementById('copied');
+let fileBuf=null,isNpvt=false;
+
+drop.addEventListener('click',()=>fi.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');if(e.dataTransfer.files.length)pickFile(e.dataTransfer.files[0])});
+fi.addEventListener('change',()=>{if(fi.files.length)pickFile(fi.files[0])});
+
+function pickFile(f){
+    drop.querySelector('p').textContent='📎 '+f.name;
+    const r=new FileReader();
+    r.onload=e=>{
+        fileBuf=new Uint8Array(e.target.result);
+        const head=String.fromCharCode(...fileBuf.slice(0,4));
+        if(head==='NPVT'){
+            isNpvt=true;
+            pwdBox.style.display='block';
+            show('info','🔑 فایل رمزنگاری شده. رمز رو وارد کن.');
+        }else if(head==='NPVT'){
+            isNpvt=true;pwdBox.style.display='block';
+            show('info','🔑 فایل رمزنگاری شده. رمز رو وارد کن.');
+        }else{
+            // JSON file
+            isNpvt=false;
+            tryParse(new TextDecoder().decode(fileBuf));
+        }
+    };
+    r.readAsArrayBuffer(f);
+}
+
+function show(cls,msg){status.className=cls;status.innerHTML=msg;status.style.display='block'}
+
+async function doDecrypt(){
+    if(!fileBuf||!pwd.value)return;
+    show('info','<span class="spinner"></span>در حال رمزگشایی...');
+    document.getElementById('decryptBtn').disabled=true;
+    try{
+        const plain=await aesDecrypt(fileBuf,pwd.value);
+        if(!plain){show('err','❌ رمز اشتباهه یا فایل خرابه');document.getElementById('decryptBtn').disabled=false;return}
+        // check NPVT1
+        const text=new TextDecoder().decode(plain);
+        if(text.startsWith('{')||text.startsWith('[')){
+            tryParse(text);
+        }else{
+            // NPVT1 layer
+            const raw=new Uint8Array(plain);
+            const dec=decryptNPVT1(raw);
+            tryParse(new TextDecoder().decode(dec));
+        }
+    }catch(e){
+        show('err','❌ خطا: '+e.message);
+    }
+    document.getElementById('decryptBtn').disabled=false;
+}
+
+async function aesDecrypt(buf,pwdStr){
+    // NPVT header: NPVT(4) + salt(8) + iv(16) + ciphertext
+    if(buf.length<32)return null;
+    const salt=buf.slice(4,12);
+    const iv=buf.slice(12,28);
+    const ct=buf.slice(28);
+    // key = SHA-256(pwd)
+    const keyData=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pwdStr));
+    const key=await crypto.subtle.importKey('raw',keyData,{name:'AES-CBC'},false,['decrypt']);
+    try{
+        const dec=await crypto.subtle.decrypt({name:'AES-CBC',iv},key,ct);
+        return new Uint8Array(dec);
+    }catch(e){return null}
+}
+
+// NPVT1 cipher — ported from npvt_cipher.py
+function decryptNPVT1(ctWithNonce){
+    if(ctWithNonce.length<16)return ctWithNonce;
+    const T=NPVT_TABLES;
+    const nonce=Array.from(ctWithNonce.slice(0,16));
+    const ct=ctWithNonce.slice(16);
+    const out=new Uint8Array(ct.length);
+    let counter=[...nonce];
+    for(let i=0;i<ct.length;i++){
+        if(i%16===0){
+            const ks=coreTransform(counter,T);
+            for(let j=0;j<16;j++)counter[j]=ks[j];
+            // increment counter
+            for(let k=15;k>=0;k--){counter[k]=(counter[k]+1)&0xFF;if(counter[k]!==0)break}
+        }
+        out[i]=ct[i]^counter[i%16];
+        // restore counter for next block
+        if(i%16===15){
+            for(let j=0;j<16;j++)counter[j]=(nonce[j]+Math.floor(i/16+1))&0xFF;
+            // simpler: just recalc from nonce + block index
+        }
+    }
+    // redo properly
+    counter=[...nonce];
+    let blockIdx=0;
+    for(let i=0;i<ct.length;i++){
+        if(i%16===0){
+            const ks=coreTransform([...counter],T);
+            for(let j=0;j<16;j++)out[i+j]=ct[i+j]^ks[j];
+            // increment counter
+            for(let k=15;k>=0;k--){counter[k]=(counter[k]+1)&0xFF;if(counter[k]!==0)break}
+            blockIdx++;
+        }
+    }
+    return out;
+}
+
+function coreTransform(block,T){
+    let buf=[...block];
+    const nr=T.nr,so=T.shift_order;
+    for(let r=0;r<nr-1;r++){
+        // shiftRows
+        buf=so.map(i=>buf[i]);
+        for(let col=0;col<4;col++){
+            const base=col*4;
+            const iC=T.tyBoxes[base][buf[base]];
+            const iC2=T.tyBoxes[base+1][buf[base+1]];
+            const iC3=T.tyBoxes[base+2][buf[base+2]];
+            const iC4=T.tyBoxes[base+3][buf[base+3]];
+            for(let j=0;j<4;j++){
+                const ti=col*24+j*6;
+                const sh=28-j*8,sl=24-j*8;
+                const n1=(iC>>sh)&15,n2=(iC2>>sh)&15,n3=(iC3>>sh)&15,n4=(iC4>>sh)&15;
+                const b10=T.xorTable[ti][n1][n2],b11=T.xorTable[ti+1][n3][n4];
+                const m1=(iC>>sl)&15,m2=(iC2>>sl)&15,m3=(iC3>>sl)&15,m4=(iC4>>sl)&15;
+                const lo=T.xorTable[ti+5][T.xorTable[ti+2][m1][m2]][T.xorTable[ti+3][m3][m4]];
+                const hi=T.xorTable[ti+4][b10][b11];
+                buf[base+j]=lo|(hi<<4);
+            }
+            const iC5=T.mbl[base][buf[base]],iC6=T.mbl[base+1][buf[base+1]],
+                  iC7=T.mbl[base+2][buf[base+2]],iC8=T.mbl[base+3][buf[base+3]];
+            for(let j=0;j<4;j++){
+                const ti=col*24+j*6;
+                const sh=28-j*8,sl=24-j*8;
+                const n1=(iC5>>sh)&15,n2=(iC6>>sh)&15,n3=(iC7>>sh)&15,n4=(iC8>>sh)&15;
+                const a1=T.xorTable[ti][n1][n2],a2=T.xorTable[ti+1][n3][n4];
+                const hi=T.xorTable[ti+4][a1][a2];
+                const m1=(iC5>>sl)&15,m2=(iC6>>sl)&15,m3=(iC7>>sl)&15,m4=(iC8>>sl)&15;
+                const b1=T.xorTable[ti+2][m1][m2],b2=T.xorTable[ti+3][m3][m4];
+                const lo=T.xorTable[ti+5][b1][b2];
+                buf[base+j]=(hi<<4)|lo;
+            }
+        }
+    }
+    buf=so.map(i=>buf[i]);
+    for(let i=0;i<16;i++)buf[i]=T.tboxesLast[i][buf[i]];
+    return buf;
+}
+
+function tryParse(text){
+    try{
+        const data=JSON.parse(text);
+        const configs=Array.isArray(data)?data:[data];
+        extractLinks(configs);
+    }catch(e){
+        show('err','❌ JSON معتبر نیست');
+    }
+}
+
+function extractLinks(configs){
+    let links=[];
+    configs.forEach((cfg,i)=>{
+        const profile=cfg.v2rayProfile||cfg;
+        const name=cfg.name||cfg.remarks||'config_'+(i+1);
+        // v2rayJson
+        const v2j=profile.v2rayJson||profile.v2rayjson;
+        if(v2j){
+            try{
+                const v2=typeof v2j==='string'?JSON.parse(v2j):v2j;
+                const addr=v2.address||v2.add||'';
+                const port=v2.port||443;
+                const id=v2.id||'';
+                const net=v2.network||'tcp';
+                const sni=v2.security==='tls'?(v2.sni||addr):'';
+                const path=v2.path||'';
+                const host=v2.host||'';
+                const proto=v2.protocol||'vless';
+                let url;
+                if(proto==='vless'){
+                    url=`vless://${id}@${addr}:${port}?encryption=none&security=tls&sni=${sni}&type=${net}&host=${host}&path=${path}#${name}`;
+                }else if(proto==='vmess'){
+                    const o={v:'2',ps:name,add:addr,port,id,aid:0,net:net,type:'host',host,path,tls:'tls'};
+                    url='vmess://'+btoa(JSON.stringify(o));
+                }else if(proto==='trojan'){
+                    url=`trojan://${id}@${addr}:${port}?security=tls&sni=${sni}#${name}`;
+                }
+                if(url)links.push({name,proto:proto.toUpperCase(),url});
+            }catch(e){}
+        }
+        // direct links in fields
+        ['link','url','address'].forEach(k=>{
+            if(cfg[k]&&(cfg[k].startsWith('vless://')||cfg[k].startsWith('vmess://')||cfg[k].startsWith('trojan://'))){
+                links.push({name,proto:k,url:cfg[k]});
+            }
+        });
+    });
+
+    if(!links.length){
+        show('err','⚠️ پروتکلی پیدا نشد');
+        return;
+    }
+    show('ok','✅ '+links.length+' کانفیگ پیدا شد');
+    result.style.display='block';
+    result.innerHTML=links.map((l,i)=>
+        '<div class="link" onclick="copyLink('+i+')"><div class="t">'+l.proto+'</div><div class="n">'+l.name+'</div></div>'
+    ).join('');
+    window._links=links;
+}
+
+function copyLink(i){
+    navigator.clipboard.writeText(window._links[i].url).then(()=>{
+        copied.style.display='block';setTimeout(()=>copied.style.display='none',1500);
+    }).catch(()=>{
+        const ta=document.createElement('textarea');ta.value=window._links[i].url;
+        document.body.appendChild(ta);ta.select();document.execCommand('copy');
+        document.body.removeChild(ta);copied.style.display='block';
+        setTimeout(()=>copied.style.display='none',1500);
+    });
+}
+</script>
+</body>
+</html>
